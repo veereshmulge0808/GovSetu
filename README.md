@@ -1,4 +1,5 @@
 # 🚀 AI-Powered Government Innovation Procurement Platform
+# GovSetu
 
 > **A unified digital platform for identifying government challenges, discovering innovative startups, evaluating solutions, conducting pilots, managing procurement, and scaling successful innovations.**
 
