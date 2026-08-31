@@ -1,0 +1,89 @@
+version: '3.9'
+
+# =============================================================================
+# GovSetu — Local Development Services
+# Starts: PostgreSQL (with pgvector), Redis, MinIO
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL + pgvector
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: govsetu_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: govsetu
+      POSTGRES_PASSWORD: govsetu_pass
+      POSTGRES_DB: govsetu_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U govsetu -d govsetu_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # Redis — Cache + BullMQ job queue
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: govsetu_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # MinIO — S3-compatible object storage (documents, files)
+  # ---------------------------------------------------------------------------
+  minio:
+    image: minio/minio:latest
+    container_name: govsetu_minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"    # API
+      - "9001:9001"    # Web Console
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # ---------------------------------------------------------------------------
+  # MailHog — Local email testing (catches outgoing SMTP)
+  # ---------------------------------------------------------------------------
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: govsetu_mailhog
+    restart: unless-stopped
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # Web UI
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+
+networks:
+  default:
+    name: govsetu_network
