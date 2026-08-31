@@ -1,4 +1,4 @@
-# 🚀 AI-Powered Government Innovation Procurement Platform
+# AI-Powered Government Innovation Procurement Platform
 # GovSetu
 
 > **A unified digital platform for identifying government challenges, discovering innovative startups, evaluating solutions, conducting pilots, managing procurement, and scaling successful innovations.**
@@ -15,12 +15,12 @@ Traditional government procurement processes are primarily designed for establis
 
 This project proposes an **AI-powered Government Innovation Procurement Platform** that creates a structured bridge between:
 
-- 🏛️ Government departments and public agencies
-- 🚀 Startups and innovative companies
-- 👨‍💻 Innovation evaluators and domain experts
-- 💰 Procurement authorities
-- 🧪 Pilot implementation partners
-- 📊 Policymakers and administrators
+- Government departments and public agencies
+- Startups and innovative companies
+- Innovation evaluators and domain experts
+- Procurement authorities
+- Pilot implementation partners
+- Policymakers and administrators
 
 The platform will digitize and intelligently manage the complete **innovation procurement lifecycle**, from identifying a government problem to scaling a successful startup solution.
 
@@ -193,7 +193,7 @@ Government users can:
 
 ---
 
-## 🚀 Startups
+## Startups
 
 Startups can:
 
@@ -208,7 +208,7 @@ Startups can:
 
 ---
 
-## 👨‍⚖️ Evaluators and Experts
+## Evaluators and Experts
 
 Experts can:
 
@@ -221,7 +221,7 @@ Experts can:
 
 ---
 
-## 🧑‍💼 Procurement Officers
+## Procurement Officers
 
 Procurement teams can:
 
@@ -234,7 +234,7 @@ Procurement teams can:
 
 ---
 
-## 📊 Policymakers and Administrators
+## Policymakers and Administrators
 
 Administrators can:
 
