@@ -1,6 +1,10 @@
 {
+  "extends": "./tsconfig.json",
   "compilerOptions": {
-    "extends": "./tsconfig.json",
-    "exclude": ["node_modules", "test", "dist", "**/*spec.ts"]
-  }
+    "useDefineForClassFields": false,
+    "strictNullChecks": false,
+    "noImplicitAny": false,
+    "strictBindCallApply": false
+  },
+  "exclude": ["node_modules", "test", "dist", "**/*spec.ts"]
 }
