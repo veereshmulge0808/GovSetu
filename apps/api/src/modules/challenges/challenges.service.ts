@@ -88,7 +88,7 @@ export class ChallengesService {
         submissionDeadline: dto.submissionDeadline
           ? new Date(dto.submissionDeadline)
           : undefined,
-        evaluationCriteria: dto.evaluationCriteria ?? undefined,
+        evaluationCriteria: dto.evaluationCriteria ? (dto.evaluationCriteria as any) : undefined,
         status: ChallengeStatus.DRAFT,
       },
       include: { organization: { select: { id: true, name: true } }, createdBy: { select: { id: true, firstName: true, lastName: true } } },
@@ -101,7 +101,7 @@ export class ChallengesService {
         entityType: 'Challenge',
         entityId: challenge.id,
         challengeId: challenge.id,
-        newValue: { title: challenge.title, status: challenge.status },
+        newValue: { title: challenge.title, status: challenge.status } as any,
       },
     });
 
@@ -202,7 +202,7 @@ export class ChallengesService {
         submissionDeadline: dto.submissionDeadline
           ? new Date(dto.submissionDeadline)
           : undefined,
-        evaluationCriteria: dto.evaluationCriteria ?? undefined,
+        evaluationCriteria: dto.evaluationCriteria ? (dto.evaluationCriteria as any) : undefined,
       },
     });
 
@@ -213,8 +213,8 @@ export class ChallengesService {
         entityType: 'Challenge',
         entityId: id,
         challengeId: id,
-        previousValue: { title: challenge.title, status: challenge.status },
-        newValue: { title: updated.title, ...dto },
+        previousValue: { title: challenge.title, status: challenge.status } as any,
+        newValue: { title: updated.title, ...dto } as any,
       },
     });
 

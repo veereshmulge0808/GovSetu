@@ -1,8 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
-import { firstValueFrom } from 'rxjs';
+import axios from 'axios';
 
 /**
  * MatchingService orchestrates AI-powered startup-challenge matching.
@@ -19,7 +18,6 @@ export class MatchingService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly httpService: HttpService,
     private readonly config: ConfigService,
   ) {}
 
@@ -39,20 +37,29 @@ export class MatchingService {
     const aiServiceUrl = this.config.get<string>('AI_SERVICE_URL', 'http://localhost:8000');
 
     try {
-      // Call Python AI service for matching
-      const response = await firstValueFrom(
-        this.httpService.post(`${aiServiceUrl}/api/v1/match/challenge`, {
+      const response = await axios.post(`${aiServiceUrl}/api/v1/match/challenge`, {
+        challengeId,
+        title: challenge.title,
+        description: challenge.description,
+        problemStatement: challenge.problemStatement,
+        sector: challenge.sector,
+        domain: challenge.domain,
+        technicalRequirements: challenge.technicalRequirements,
+        budgetMinLakh: challenge.budgetMinLakh,
+        budgetMaxLakh: challenge.budgetMaxLakh,
+      }, { timeout: 30000 });
+
+      // Audit AI trigger
+      await this.prisma.auditLog.create({
+        data: {
+          actorId: challengeId, // system action
+          action: 'AI_MATCHING_TRIGGERED' as any,
+          entityType: 'Challenge',
+          entityId: challengeId,
           challengeId,
-          title: challenge.title,
-          description: challenge.description,
-          problemStatement: challenge.problemStatement,
-          sector: challenge.sector,
-          domain: challenge.domain,
-          technicalRequirements: challenge.technicalRequirements,
-          budgetMinLakh: challenge.budgetMinLakh,
-          budgetMaxLakh: challenge.budgetMaxLakh,
-        }),
-      );
+          newValue: { aiServiceUrl } as any,
+        },
+      }).catch(() => null); // non-blocking
 
       this.logger.log(`AI matching completed for challenge ${challengeId}`);
       return response.data;
@@ -106,22 +113,22 @@ export class MatchingService {
 
   /**
    * Fallback: deterministic rules-based match when AI service is unavailable.
-   * Uses sector/domain/TRL overlap as a rough proxy for relevance.
    */
-  private async fallbackMatch(challengeId: string, challenge: { sector: string | null; domain: string | null; budgetMaxLakh: number | null }) {
+  private async fallbackMatch(challengeId: string, challenge: any) {
     const startupProfiles = await this.prisma.startupProfile.findMany({
       take: 50,
-      include: { organization: true },
+      include: { organization: { select: { id: true, name: true } } },
     });
 
     const scores = startupProfiles.map((sp) => {
-      let score = 50; // Base score
+      let score = 50;
 
-      // Domain match
-      if (challenge.sector && sp.industries?.some((i) => i.toLowerCase().includes(challenge.sector!.toLowerCase()))) {
+      if (challenge.sector && sp.industries?.some((i: string) =>
+        i.toLowerCase().includes((challenge.sector as string).toLowerCase()))) {
         score += 20;
       }
-      if (challenge.domain && sp.technologies?.some((t) => t.toLowerCase().includes(challenge.domain!.toLowerCase()))) {
+      if (challenge.domain && sp.technologies?.some((t: string) =>
+        t.toLowerCase().includes((challenge.domain as string).toLowerCase()))) {
         score += 20;
       }
       if (sp.govtExperience) score += 10;
@@ -142,7 +149,7 @@ export class MatchingService {
     });
 
     scores.sort((a, b) => b.overallScore - a.overallScore);
-    return { data: scores.slice(0, 20), fallback: true };
+    return { data: scores.slice(0, 20), fallback: true, challengeId };
   }
 
   async findAll() {
