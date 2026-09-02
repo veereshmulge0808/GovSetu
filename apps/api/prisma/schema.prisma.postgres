@@ -1,0 +1,845 @@
+// =============================================================================
+// GovSetu — Prisma Schema
+// AI-Powered Government Innovation Procurement Platform
+// =============================================================================
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pgvector(map: "vector"), uuidOssp(map: "uuid-ossp"), pgTrgm(map: "pg_trgm")]
+}
+
+// =============================================================================
+// ENUMS
+// =============================================================================
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  GOVERNMENT_OFFICER
+  PILOT_MANAGER
+  PROCUREMENT_OFFICER
+  EVALUATOR
+  STARTUP_USER
+}
+
+enum OrganizationType {
+  GOVERNMENT
+  STARTUP
+  RESEARCH
+  NGO
+}
+
+enum ChallengeStatus {
+  DRAFT
+  INTERNAL_REVIEW
+  APPROVED
+  PUBLISHED
+  STARTUP_DISCOVERY
+  EVALUATION
+  PILOT
+  PROCUREMENT
+  COMPLETED
+  CANCELLED
+}
+
+enum ApplicationStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  ADDITIONAL_INFO_REQUIRED
+  SHORTLISTED
+  REJECTED
+  SELECTED
+  PILOT_STAGE
+  COMPLETED
+}
+
+enum PilotStatus {
+  PLANNING
+  APPROVED
+  IN_PROGRESS
+  PAUSED
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum ProcurementStatus {
+  PENDING
+  COMPLIANCE_REVIEW
+  DOCUMENTATION
+  APPROVAL
+  CONTRACTING
+  IMPLEMENTATION
+  COMPLETED
+  CANCELLED
+}
+
+enum NotificationStatus {
+  UNREAD
+  READ
+  ARCHIVED
+}
+
+enum NotificationType {
+  CHALLENGE_PUBLISHED
+  APPLICATION_STATUS_CHANGED
+  EVALUATION_ASSIGNED
+  EVALUATION_SUBMITTED
+  PILOT_STARTED
+  PILOT_MILESTONE_DUE
+  PILOT_COMPLETED
+  PROCUREMENT_INITIATED
+  DOCUMENT_REQUESTED
+  DEADLINE_REMINDER
+  MATCH_FOUND
+  GENERAL
+}
+
+enum DocumentCategory {
+  STARTUP_PROFILE
+  CERTIFICATION
+  TECHNICAL_PROPOSAL
+  FINANCIAL_DOCUMENT
+  PILOT_REPORT
+  PROCUREMENT_DOCUMENT
+  CASE_STUDY
+  OTHER
+}
+
+enum TechnologyReadinessLevel {
+  TRL_1
+  TRL_2
+  TRL_3
+  TRL_4
+  TRL_5
+  TRL_6
+  TRL_7
+  TRL_8
+  TRL_9
+}
+
+enum FundingStage {
+  BOOTSTRAPPED
+  PRE_SEED
+  SEED
+  SERIES_A
+  SERIES_B
+  SERIES_C_PLUS
+  PROFITABLE
+  LISTED
+}
+
+enum AuditAction {
+  CHALLENGE_CREATED
+  CHALLENGE_UPDATED
+  CHALLENGE_PUBLISHED
+  CHALLENGE_CANCELLED
+  APPLICATION_SUBMITTED
+  APPLICATION_STATUS_CHANGED
+  EVALUATION_ASSIGNED
+  EVALUATION_SUBMITTED
+  EVALUATION_SCORE_MODIFIED
+  PILOT_CREATED
+  PILOT_APPROVED
+  PILOT_COMPLETED
+  PROCUREMENT_INITIATED
+  PROCUREMENT_APPROVED
+  USER_REGISTERED
+  USER_LOGIN
+  USER_ROLE_CHANGED
+  USER_DISABLED
+  AI_MATCHING_TRIGGERED
+  AI_RECOMMENDATION_GENERATED
+  DOCUMENT_UPLOADED
+  DOCUMENT_DELETED
+}
+
+// =============================================================================
+// USER & AUTHENTICATION
+// =============================================================================
+
+/// Platform user — represents any human actor on the system.
+/// Users belong to an organization and carry one or more roles.
+model User {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email          String   @unique @db.VarChar(320)
+  passwordHash   String   @db.VarChar(255)
+  firstName      String   @db.VarChar(100)
+  lastName       String   @db.VarChar(100)
+  phone          String?  @db.VarChar(20)
+  avatarUrl      String?
+  role           UserRole @default(STARTUP_USER)
+
+  isEmailVerified  Boolean   @default(false)
+  isActive         Boolean   @default(true)
+  lastLoginAt      DateTime?
+  emailVerifyToken String?   @db.VarChar(255)
+  passwordResetToken String? @db.VarChar(255)
+  passwordResetExpiry DateTime?
+  refreshToken     String?   @db.VarChar(512)
+
+  organizationId String? @db.Uuid
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  createdChallenges      Challenge[]        @relation("ChallengeCreator")
+  applications           Application[]      @relation("ApplicantUser")
+  evaluations            EvaluatorAssignment[]
+  notifications          Notification[]
+  auditLogs              AuditLog[]         @relation("AuditActor")
+  uploadedDocuments      Document[]
+  pilotMilestoneUpdates  PilotMilestoneUpdate[]
+
+  @@index([email])
+  @@index([organizationId])
+  @@index([role])
+  @@map("users")
+}
+
+// =============================================================================
+// ORGANIZATIONS
+// =============================================================================
+
+/// An organization on the platform — either a Government Department or a Startup.
+model Organization {
+  id          String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String           @db.VarChar(255)
+  slug        String           @unique @db.VarChar(255)
+  type        OrganizationType
+  description String?          @db.Text
+  logoUrl     String?
+  website     String?          @db.VarChar(500)
+  email       String?          @db.VarChar(320)
+  phone       String?          @db.VarChar(20)
+  address     String?          @db.Text
+  city        String?          @db.VarChar(100)
+  state       String?          @db.VarChar(100)
+  country     String           @default("India") @db.VarChar(100)
+  pincode     String?          @db.VarChar(10)
+
+  isVerified  Boolean @default(false)
+  isActive    Boolean @default(true)
+
+  // Flexible metadata via JSONB (industry codes, sector tags, etc.)
+  metadata    Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  users            User[]
+  governmentDept   GovernmentDepartment?
+  startupProfile   StartupProfile?
+  challenges       Challenge[]
+  documents        Document[]
+
+  @@index([type])
+  @@index([slug])
+  @@map("organizations")
+}
+
+/// Extended profile for Government Department organizations.
+model GovernmentDepartment {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String       @unique @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  ministryName      String? @db.VarChar(255)
+  departmentCode    String? @db.VarChar(50)
+  annualBudgetCrore Float?
+  sector            String? @db.VarChar(100) // e.g. "Water Management", "Smart Cities"
+  jurisdiction      String? @db.VarChar(100) // e.g. "National", "State", "Municipal"
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("government_departments")
+}
+
+/// Extended profile for Startup organizations.
+model StartupProfile {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String       @unique @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  foundingYear       Int?
+  teamSize           Int?
+  fundingStage       FundingStage?
+  totalFundingUsd    Float?
+  revenueModel       String?   @db.VarChar(255)
+  trlLevel           TechnologyReadinessLevel?
+  industries         String[]  // Array of industry tags
+  technologies       String[]  // Array of technology tags e.g. ["IoT", "AI", "Blockchain"]
+  geographies        String[]  // Operational geographies
+  govtExperience     Boolean   @default(false)
+  prevGovtProjects   String?   @db.Text
+  certifications     String[]
+
+  // AI-generated capability embedding (for semantic matching)
+  embedding          Unsupported("vector(1536)")?
+
+  // AI-generated capability summary
+  aiCapabilitySummary String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  solutions          Solution[]
+  applications       Application[]
+  matchScores        MatchScore[]
+
+  @@index([trlLevel])
+  @@index([fundingStage])
+  @@map("startup_profiles")
+}
+
+/// A specific product or solution offered by a startup.
+model Solution {
+  id               String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  startupProfileId String        @db.Uuid
+  startupProfile   StartupProfile @relation(fields: [startupProfileId], references: [id], onDelete: Cascade)
+
+  name             String        @db.VarChar(255)
+  description      String        @db.Text
+  problemSolved    String?       @db.Text
+  technologies     String[]
+  industries       String[]
+  trlLevel         TechnologyReadinessLevel?
+
+  // AI-generated embedding for semantic search
+  embedding        Unsupported("vector(1536)")?
+
+  deploymentCount  Int?   // Number of deployments
+  clientCount      Int?   // Number of clients
+
+  isActive         Boolean @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([startupProfileId])
+  @@map("solutions")
+}
+
+// =============================================================================
+// CHALLENGES
+// =============================================================================
+
+/// A government innovation challenge — the core lifecycle entity.
+model Challenge {
+  id             String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String          @db.Uuid
+  organization   Organization    @relation(fields: [organizationId], references: [id])
+  createdById    String          @db.Uuid
+  createdBy      User            @relation("ChallengeCreator", fields: [createdById], references: [id])
+
+  title          String          @db.VarChar(500)
+  slug           String          @unique @db.VarChar(500)
+  description    String          @db.Text
+  problemStatement String        @db.Text
+  desiredOutcome String?         @db.Text
+  existingApproach String?       @db.Text
+
+  sector         String?         @db.VarChar(100)  // e.g. "Water", "Healthcare"
+  domain         String?         @db.VarChar(100)  // e.g. "IoT", "AI"
+  location       String?         @db.VarChar(255)
+  state          String?         @db.VarChar(100)
+  targetBeneficiaries String?    @db.Text
+
+  // Requirements
+  technicalRequirements String?  @db.Text
+  functionalRequirements String? @db.Text
+  constraints    String?         @db.Text
+  eligibilityCriteria String?    @db.Text
+
+  // Budget and timeline
+  budgetMinLakh  Float?
+  budgetMaxLakh  Float?
+  pilotDurationDays Int?
+  submissionDeadline DateTime?
+  pilotStartDate DateTime?
+
+  status         ChallengeStatus @default(DRAFT)
+
+  // AI-generated fields
+  aiAnalysis     Json?           // AI-extracted requirements, categories, technology tags
+  embedding      Unsupported("vector(1536)")?  // For semantic matching
+  aiSummary      String?         @db.Text
+
+  // Evaluation configuration
+  evaluationCriteria Json?       // Array of { criterion, weight, description }
+  maxScore       Float?          @default(100)
+
+  publishedAt    DateTime?
+  completedAt    DateTime?
+
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  // Relations
+  applications   Application[]
+  matchScores    MatchScore[]
+  pilots         Pilot[]
+  documents      Document[]
+  auditLogs      AuditLog[]
+
+  @@index([status])
+  @@index([organizationId])
+  @@index([sector])
+  @@index([submissionDeadline])
+  @@map("challenges")
+}
+
+// =============================================================================
+// APPLICATIONS
+// =============================================================================
+
+/// A startup's application to a government challenge.
+model Application {
+  id               String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  challengeId      String            @db.Uuid
+  challenge        Challenge         @relation(fields: [challengeId], references: [id])
+  startupProfileId String            @db.Uuid
+  startupProfile   StartupProfile    @relation(fields: [startupProfileId], references: [id])
+  applicantUserId  String            @db.Uuid
+  applicantUser    User              @relation("ApplicantUser", fields: [applicantUserId], references: [id])
+
+  status           ApplicationStatus @default(DRAFT)
+
+  // Application content
+  executiveSummary       String?     @db.Text
+  technicalApproach      String?     @db.Text
+  implementationPlan     String?     @db.Text
+  teamDescription        String?     @db.Text
+  previousExperience     String?     @db.Text
+  proposedBudgetLakh     Float?
+  proposedTimeline       String?     @db.VarChar(255)
+  differentiators        String?     @db.Text
+  scalabilityPlan        String?     @db.Text
+  riskMitigation         String?     @db.Text
+
+  // AI-generated fields
+  aiReadinessScore       Float?      // 0-100 AI eligibility score
+  aiReadinessSummary     String?     @db.Text
+
+  // Status tracking
+  submittedAt            DateTime?
+  reviewedAt             DateTime?
+  shortlistedAt          DateTime?
+  rejectionReason        String?     @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  evaluatorAssignments   EvaluatorAssignment[]
+  evaluationScores       EvaluationScore[]
+  documents              Document[]
+  pilot                  Pilot?
+  auditLogs              AuditLog[]
+
+  @@unique([challengeId, startupProfileId])  // One application per startup per challenge
+  @@index([challengeId])
+  @@index([startupProfileId])
+  @@index([status])
+  @@map("applications")
+}
+
+// =============================================================================
+// EVALUATIONS
+// =============================================================================
+
+/// Assigns an evaluator to review a specific application.
+model EvaluatorAssignment {
+  id            String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  applicationId String      @db.Uuid
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  evaluatorId   String      @db.Uuid
+  evaluator     User        @relation(fields: [evaluatorId], references: [id])
+
+  isCompleted   Boolean   @default(false)
+  assignedAt    DateTime  @default(now())
+  completedAt   DateTime?
+  dueDate       DateTime?
+
+  // Summary generated by this evaluator
+  summary       String?   @db.Text
+  recommendation String?  @db.Text  // "Shortlist" | "Reject" | "Need More Info"
+
+  // AI-generated summary for the evaluator to review
+  aiSummary     String?   @db.Text
+  aiRisks       Json?     // Array of identified risks
+
+  scores        EvaluationScore[]
+
+  @@unique([applicationId, evaluatorId])
+  @@index([evaluatorId])
+  @@map("evaluator_assignments")
+}
+
+/// A score given by an evaluator for a specific evaluation criterion.
+model EvaluationScore {
+  id                   String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  assignmentId         String              @db.Uuid
+  assignment           EvaluatorAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  applicationId        String              @db.Uuid
+  application          Application         @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  criterion            String              @db.VarChar(255) // e.g. "Technical Capability"
+  maxScore             Float               // Maximum possible score for this criterion
+  score                Float               // Actual score given
+  weight               Float               // Weight 0–1 for this criterion
+  comments             String?             @db.Text
+  evidence             String?             @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([applicationId])
+  @@index([assignmentId])
+  @@map("evaluation_scores")
+}
+
+// =============================================================================
+// AI MATCHING
+// =============================================================================
+
+/// Stores the AI-computed match score between a challenge and a startup profile.
+model MatchScore {
+  id               String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  challengeId      String        @db.Uuid
+  challenge        Challenge     @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  startupProfileId String        @db.Uuid
+  startupProfile   StartupProfile @relation(fields: [startupProfileId], references: [id], onDelete: Cascade)
+
+  // Score components (all 0–100)
+  overallScore          Float
+  semanticScore         Float    // Embedding cosine similarity score
+  domainScore           Float    // Domain/sector compatibility
+  technologyScore       Float    // Technology match score
+  experienceScore       Float    // Government experience score
+  readinessScore        Float    // TRL level appropriateness
+  geographicScore       Float    // Location compatibility
+  budgetScore           Float    // Budget compatibility
+
+  // Explanations
+  explanation           Json     // Array of { factor, score, reason } objects
+  risks                 Json?    // Array of identified risks
+
+  // Model version for reproducibility / audit
+  modelVersion          String   @default("1.0") @db.VarChar(50)
+
+  computedAt   DateTime @default(now())
+  expiresAt    DateTime // Scores expire and need recomputation when profiles change
+
+  @@unique([challengeId, startupProfileId])
+  @@index([challengeId])
+  @@index([overallScore])
+  @@map("match_scores")
+}
+
+// =============================================================================
+// PILOTS
+// =============================================================================
+
+/// A pilot project — testing a startup solution in a real government environment.
+model Pilot {
+  id            String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  challengeId   String      @db.Uuid
+  challenge     Challenge   @relation(fields: [challengeId], references: [id])
+  applicationId String      @unique @db.Uuid
+  application   Application @relation(fields: [applicationId], references: [id])
+
+  title         String      @db.VarChar(500)
+  status        PilotStatus @default(PLANNING)
+
+  // Pilot scope
+  objective     String      @db.Text
+  scope         String?     @db.Text
+  location      String?     @db.VarChar(255)
+  successCriteria String?   @db.Text
+  risks         String?     @db.Text
+
+  // Budget
+  budgetApprovedLakh Float?
+  budgetUsedLakh     Float?
+
+  // Timeline
+  plannedStartDate   DateTime?
+  plannedEndDate     DateTime?
+  actualStartDate    DateTime?
+  actualEndDate      DateTime?
+
+  // Outcomes
+  finalOutcome       String?   @db.Text
+  finalReport        String?   @db.Text
+  isSuccessful       Boolean?
+  procurementRecommended Boolean @default(false)
+
+  // AI-generated pilot summary
+  aiPerformanceSummary String? @db.Text
+
+  approvedAt    DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  kpis              PilotKPI[]
+  milestones        PilotMilestone[]
+  progressReports   PilotProgressReport[]
+  documents         Document[]
+  procurement       Procurement?
+  auditLogs         AuditLog[]
+
+  @@index([challengeId])
+  @@index([status])
+  @@map("pilots")
+}
+
+/// Key Performance Indicator tracked during a pilot.
+model PilotKPI {
+  id       String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  pilotId  String @db.Uuid
+  pilot    Pilot  @relation(fields: [pilotId], references: [id], onDelete: Cascade)
+
+  name          String  @db.VarChar(255)
+  description   String? @db.Text
+  unit          String? @db.VarChar(50)  // e.g. "%", "minutes", "INR"
+  targetValue   Float?
+  currentValue  Float?
+  baselineValue Float?
+  isAchieved    Boolean @default(false)
+
+  measurements  PilotKPIMeasurement[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([pilotId])
+  @@map("pilot_kpis")
+}
+
+/// A recorded measurement of a KPI at a point in time.
+model PilotKPIMeasurement {
+  id      String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  kpiId   String   @db.Uuid
+  kpi     PilotKPI @relation(fields: [kpiId], references: [id], onDelete: Cascade)
+
+  value       Float
+  measuredAt  DateTime
+  notes       String?  @db.Text
+
+  @@index([kpiId])
+  @@map("pilot_kpi_measurements")
+}
+
+/// A milestone in the pilot project plan.
+model PilotMilestone {
+  id      String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  pilotId String @db.Uuid
+  pilot   Pilot  @relation(fields: [pilotId], references: [id], onDelete: Cascade)
+
+  title       String    @db.VarChar(500)
+  description String?   @db.Text
+  dueDate     DateTime
+  isCompleted Boolean   @default(false)
+  completedAt DateTime?
+  notes       String?   @db.Text
+
+  updates     PilotMilestoneUpdate[]
+
+  @@index([pilotId])
+  @@map("pilot_milestones")
+}
+
+/// A progress update on a pilot milestone.
+model PilotMilestoneUpdate {
+  id          String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  milestoneId String         @db.Uuid
+  milestone   PilotMilestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+  userId      String         @db.Uuid
+  user        User           @relation(fields: [userId], references: [id])
+
+  content     String   @db.Text
+  createdAt   DateTime @default(now())
+
+  @@map("pilot_milestone_updates")
+}
+
+/// A periodic progress report for a pilot.
+model PilotProgressReport {
+  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  pilotId   String @db.Uuid
+  pilot     Pilot  @relation(fields: [pilotId], references: [id], onDelete: Cascade)
+
+  reportPeriod String  @db.VarChar(100)  // e.g. "Week 1", "Month 2"
+  summary      String  @db.Text
+  achievements String? @db.Text
+  challenges   String? @db.Text
+  nextSteps    String? @db.Text
+
+  submittedAt DateTime @default(now())
+
+  @@index([pilotId])
+  @@map("pilot_progress_reports")
+}
+
+// =============================================================================
+// PROCUREMENT
+// =============================================================================
+
+/// Procurement record initiated after a successful pilot.
+model Procurement {
+  id      String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  pilotId String @unique @db.Uuid
+  pilot   Pilot  @relation(fields: [pilotId], references: [id])
+
+  status  ProcurementStatus @default(PENDING)
+
+  // Procurement details
+  contractValueLakh Float?
+  contractDuration  String?    @db.VarChar(100)  // e.g. "3 years"
+  complianceNotes   String?    @db.Text
+  securityReview    String?    @db.Text
+  financialReview   String?    @db.Text
+  legalNotes        String?    @db.Text
+
+  // Approvals
+  procurementOfficerNotes String? @db.Text
+  approvedAt              DateTime?
+  contractSignedAt        DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  documents Document[]
+  auditLogs AuditLog[]
+
+  @@index([status])
+  @@map("procurement_records")
+}
+
+// =============================================================================
+// DOCUMENTS
+// =============================================================================
+
+/// A file or document uploaded to the platform (stored in object storage).
+model Document {
+  id             String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  uploadedById   String          @db.Uuid
+  uploadedBy     User            @relation(fields: [uploadedById], references: [id])
+  organizationId String?         @db.Uuid
+  organization   Organization?   @relation(fields: [organizationId], references: [id])
+
+  filename       String          @db.VarChar(500)
+  originalName   String          @db.VarChar(500)
+  mimeType       String          @db.VarChar(100)
+  sizeBytes      BigInt
+  storageKey     String          @db.VarChar(1000)  // Object storage key
+  category       DocumentCategory @default(OTHER)
+
+  // AI-processed content
+  extractedText  String?         @db.Text   // Full extracted text
+  aiSummary      String?         @db.Text   // AI-generated summary
+  isProcessed    Boolean         @default(false)
+
+  // Optional parent entity links
+  challengeId    String?         @db.Uuid
+  challenge      Challenge?      @relation(fields: [challengeId], references: [id])
+  applicationId  String?         @db.Uuid
+  application    Application?    @relation(fields: [applicationId], references: [id])
+  pilotId        String?         @db.Uuid
+  pilot          Pilot?          @relation(fields: [pilotId], references: [id])
+  procurementId  String?         @db.Uuid
+  procurement    Procurement?    @relation(fields: [procurementId], references: [id])
+
+  isActive Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([uploadedById])
+  @@index([organizationId])
+  @@index([challengeId])
+  @@index([applicationId])
+  @@map("documents")
+}
+
+// =============================================================================
+// NOTIFICATIONS
+// =============================================================================
+
+/// In-app notification for a user.
+model Notification {
+  id        String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String             @db.Uuid
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type      NotificationType
+  status    NotificationStatus @default(UNREAD)
+  title     String             @db.VarChar(500)
+  body      String             @db.Text
+  actionUrl String?            @db.VarChar(1000)
+
+  // Optional reference to the triggering entity
+  referenceId   String? @db.Uuid
+  referenceType String? @db.VarChar(100)  // e.g. "Challenge", "Application"
+
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([status])
+  @@map("notifications")
+}
+
+// =============================================================================
+// AUDIT LOGS
+// =============================================================================
+
+/// Immutable audit trail of all critical platform actions.
+model AuditLog {
+  id         String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorId    String      @db.Uuid
+  actor      User        @relation("AuditActor", fields: [actorId], references: [id])
+
+  action     AuditAction
+  entityType String      @db.VarChar(100)  // e.g. "Challenge", "Application"
+  entityId   String      @db.Uuid
+
+  // Before/after state for change tracking
+  previousValue Json?
+  newValue      Json?
+
+  // Request metadata
+  ipAddress     String?  @db.VarChar(45)
+  userAgent     String?  @db.VarChar(500)
+
+  // Optional entity links for fast queries
+  challengeId   String?  @db.Uuid
+  challenge     Challenge?   @relation(fields: [challengeId], references: [id])
+  applicationId String?  @db.Uuid
+  application   Application? @relation(fields: [applicationId], references: [id])
+  pilotId       String?  @db.Uuid
+  pilot         Pilot?       @relation(fields: [pilotId], references: [id])
+  procurementId String?  @db.Uuid
+  procurement   Procurement? @relation(fields: [procurementId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([actorId])
+  @@index([action])
+  @@index([entityType, entityId])
+  @@index([challengeId])
+  @@map("audit_logs")
+}

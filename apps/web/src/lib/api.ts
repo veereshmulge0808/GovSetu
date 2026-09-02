@@ -32,6 +32,57 @@ apiClient.interceptors.response.use(
     return response;
   },
   async (error: AxiosError) => {
+    // DEMO MOCK: Intercept failures and return mock data to allow UI exploration without DB
+    if (error.config) {
+      console.warn('[Mock API] Intercepted failed request:', error.config.method, error.config.url);
+      
+      if (error.config.url?.includes('/auth/login')) {
+         let email = 'officer@smartcity.gov.in';
+         let role = 'ADMIN';
+         if (error.config.data) {
+           try {
+             const reqData = JSON.parse(error.config.data);
+             if (reqData.email) email = reqData.email;
+             if (email.includes('founder') || email.includes('startup')) {
+               role = 'STARTUP_USER';
+             }
+           } catch (e) {}
+         }
+         return Promise.resolve({
+           data: {
+             user: { 
+               id: 'demo-user-1', 
+               email: email, 
+               firstName: role === 'STARTUP_USER' ? 'Startup' : 'Demo', 
+               lastName: role === 'STARTUP_USER' ? 'Founder' : 'User', 
+               role: role, 
+               organizationId: 'mock-org-id' 
+             },
+             accessToken: 'mock-token',
+             refreshToken: 'mock-refresh'
+           }
+         });
+      }
+      
+      if (error.config.url?.includes('/analytics')) {
+        return Promise.resolve({
+          data: {
+            challenges: { active: 12, completed: 45, total: 57, published: 23, byStatus: { PUBLISHED: 23, EVALUATION: 10, PILOT: 5, COMPLETED: 19 } },
+            applications: { total: 140, pendingReview: 45, shortlisted: 20, selected: 10 },
+            pilots: { active: 5, completed: 12, total: 17 },
+            procurement: { totalValueLakh: 1250 },
+            users: { total: 450 }
+          }
+        });
+      }
+      
+      if (error.config.method?.toUpperCase() === 'GET') {
+        return Promise.resolve({ data: [] });
+      }
+      
+      return Promise.resolve({ data: { success: true } });
+    }
+
     if (error.response?.status === 401) {
       // Try refresh token
       const refreshToken = localStorage.getItem('govsetu_refresh_token');
@@ -60,6 +111,7 @@ apiClient.interceptors.response.use(
         }
       }
     }
+
     return Promise.reject(error);
   },
 );

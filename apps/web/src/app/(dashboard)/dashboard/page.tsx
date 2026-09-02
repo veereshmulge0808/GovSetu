@@ -163,7 +163,7 @@ export default function DashboardPage() {
                 <EmptyState
                   icon={<FileText className="w-10 h-10" />}
                   title="No challenges yet"
-                  description="Create your first innovation challenge to get started."
+                  description={role === 'STARTUP_USER' ? 'Check back soon for new challenges.' : 'Create your first innovation challenge to get started.'}
                   action={
                     role && isGovernmentUser(role) ? (
                       <Link href="/challenges/new" className="btn-primary btn btn-sm">

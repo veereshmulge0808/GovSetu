@@ -9,6 +9,7 @@ import {
   Min,
   Max,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
 enum Environment {
   Development = 'development',
@@ -22,6 +23,7 @@ class EnvironmentVariables {
   @IsOptional()
   NODE_ENV: Environment = Environment.Development;
 
+  @Type(() => Number)
   @IsNumber()
   @Min(1)
   @Max(65535)
@@ -35,6 +37,7 @@ class EnvironmentVariables {
   @IsOptional()
   REDIS_HOST = 'localhost';
 
+  @Type(() => Number)
   @IsNumber()
   @IsOptional()
   REDIS_PORT = 6379;
