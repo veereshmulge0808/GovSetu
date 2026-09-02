@@ -76,16 +76,18 @@ export const useAuthStore = create<AuthState>()(
 );
 
 // Role-based permission helpers
-export const canCreateChallenge = (role: UserRole) =>
-  ['GOVERNMENT_OFFICER', 'ADMIN', 'SUPER_ADMIN'].includes(role);
+export const canCreateChallenge = (role?: UserRole) =>
+  role && ['GOVERNMENT_OFFICER', 'ADMIN', 'SUPER_ADMIN'].includes(role);
 
-export const canEvaluate = (role: UserRole) =>
-  ['EVALUATOR', 'ADMIN', 'SUPER_ADMIN'].includes(role);
+export const canEvaluate = (role?: UserRole) =>
+  role && ['EVALUATOR', 'ADMIN', 'SUPER_ADMIN'].includes(role);
 
-export const isAdmin = (role: UserRole) =>
-  ['ADMIN', 'SUPER_ADMIN'].includes(role);
+export const isAdmin = (role?: UserRole) =>
+  role && ['ADMIN', 'SUPER_ADMIN'].includes(role);
 
-export const isGovernmentUser = (role: UserRole) =>
-  ['GOVERNMENT_OFFICER', 'PILOT_MANAGER', 'PROCUREMENT_OFFICER', 'ADMIN', 'SUPER_ADMIN'].includes(role);
+export const isGovernmentUser = (role?: UserRole) =>
+  role && ['GOVERNMENT_OFFICER', 'PILOT_MANAGER', 'PROCUREMENT_OFFICER', 'ADMIN', 'SUPER_ADMIN'].includes(role);
 
-export const isStartup = (role: UserRole) => role === 'STARTUP_USER';
+export const isStartup = (role?: UserRole) => role === 'STARTUP_USER';
+
+export const isEvaluator = (role?: UserRole) => role === 'EVALUATOR';

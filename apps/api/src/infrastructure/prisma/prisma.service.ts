@@ -25,8 +25,12 @@ export class PrismaService
   }
 
   async onModuleInit(): Promise<void> {
-    await this.$connect();
-    this.logger.log('Prisma connected to database');
+    try {
+      await this.$connect();
+      this.logger.log('Prisma connected to database');
+    } catch (e) {
+      this.logger.warn('Failed to connect to Prisma database on startup. API will return 500s for DB requests.');
+    }
 
     // Log slow queries in development
     if (process.env.NODE_ENV === 'development') {

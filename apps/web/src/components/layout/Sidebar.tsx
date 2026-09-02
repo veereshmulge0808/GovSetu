@@ -22,6 +22,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard',       label: 'Dashboard',     icon: <LayoutDashboard className="w-4 h-4" /> },
   { href: '/challenges',      label: 'Challenges',    icon: <FileText className="w-4 h-4" /> },
   { href: '/startups',        label: 'Startups',      icon: <Zap className="w-4 h-4" />,     roles: ['GOVERNMENT_OFFICER', 'ADMIN', 'SUPER_ADMIN', 'EVALUATOR'] },
+  { href: '/startups/profile',label: 'My Profile',    icon: <Building2 className="w-4 h-4" />,roles: ['STARTUP_USER'] },
   { href: '/applications',    label: 'Applications',  icon: <ClipboardList className="w-4 h-4" /> },
   { href: '/evaluations',     label: 'Evaluations',   icon: <Star className="w-4 h-4" />,     roles: ['EVALUATOR', 'GOVERNMENT_OFFICER', 'ADMIN', 'SUPER_ADMIN'] },
   { href: '/pilots',          label: 'Pilots',        icon: <FlaskConical className="w-4 h-4" />, roles: ['GOVERNMENT_OFFICER', 'PILOT_MANAGER', 'ADMIN', 'SUPER_ADMIN'] },

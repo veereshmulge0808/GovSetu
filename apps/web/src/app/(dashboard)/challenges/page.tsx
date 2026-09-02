@@ -139,7 +139,7 @@ export default function ChallengesPage() {
         <EmptyState
           icon={<FileText className="w-10 h-10" />}
           title="No challenges found"
-          description={search ? `No results for "${search}"` : 'Be the first to post an innovation challenge.'}
+          description={search ? `No results for "${search}"` : role === 'STARTUP_USER' ? 'No active challenges available right now. Check back soon.' : 'Be the first to post an innovation challenge.'}
           action={role && isGovernmentUser(role) ? (
             <Link href="/challenges/new"><Button variant="primary"><Plus className="w-4 h-4" />Post Challenge</Button></Link>
           ) : undefined}
